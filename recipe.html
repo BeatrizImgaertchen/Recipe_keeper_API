@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Keeper App</title>
+    <style>
+        /* Style for the title outside the box */
+        header {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        h1 {
+            margin: 0;
+        }
+
+        /* Style for the button */
+        button {
+            background-color: #aed581;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        /* Hover effect for the button */
+        button:hover {
+            background-color: #9ccc65;
+        }
+
+        /* Style for the recipe display area */
+        .recipe-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+
+        /* Style for each displayed recipe */
+        .recipe-item {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #ffffff;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Style for the box containing the form */
+        .recipe-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 20px;
+            background-color: #dcedc8;
+        }
+
+        /* Style for the form elements inside the box */
+        .recipe-box label,
+        .recipe-box input,
+        .recipe-box textarea,
+        .recipe-box button {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        /* Style for the displayed recipe image */
+        .recipe-image {
+            max-width: 100%;
+            max-height: 200px; /* Adjust this value to your desired maximum height */
+            display: block;
+            margin: 10px auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Recipe Keeper</h1>
+    </header>
+
+    <div class="recipe-box">
+        <h2>Add Recipe</h2>
+        <form id="recipe-form">
+            <label for="recipe-name">Recipe Name</label>
+            <input type="text" id="recipe-name" name="recipe-name" required>
+
+            <label for="recipe-ingredients">Ingredients</label>
+            <textarea id="recipe-ingredients" name="recipe-ingredients" placeholder="List ingredients separated by commas" required></textarea>
+
+            <label for="recipeImage">Recipe Image URL:</label>
+            <input type="url" id="recipeImage" name="recipeImage" placeholder="http://example.com/my-dish.jpg">
+
+            <button type="submit">Add Recipe</button>
+        </form>
+    </div>
+    
+    <!-- Edit form (initially hidden) -->
+    <div id="edit-form" style="display: none;">
+        <h2>Edit Recipe</h2>
+        <form id="recipe-edit-form">
+            <label for="recipe-name-edit">Recipe Name</label>
+            <input type="text" id="recipe-name-edit" name="recipe-name-edit" required>
+
+            <label for="recipe-ingredients-edit">Ingredients</label>
+            <textarea id="recipe-ingredients-edit" name="recipe-ingredients-edit" placeholder="List ingredients separated by commas" required></textarea>
+  
+            <label for="recipe-image-edit">Recipe Image URL:</label>
+            <input type="url" id="recipe-image-edit" name="recipe-image-edit" placeholder="http://example.com/my-dish.jpg">
+  
+            <button type="submit">Save</button>
+        </form>
+    </div>
+
+    <!-- Displayed recipes (with "Edit" buttons) -->
+    <div class="recipe-box">
+        <h2>Your Recipes</h2>
+        <div id="recipes-list">
+            <!-- Recipes will be displayed here -->
+            <!-- Each recipe item should have an "Edit" button -->
+        </div>
+    </div>
+
+    <!-- Error message container -->
+    <div id="error-message" style="display: none;"></div>
+  
+    <script>
+        const recipesEndpoint = 'http://127.0.0.1:8000/recipes';
+        let recipes; // Declare the recipes variable globally
+
+        // Get references to form input elements for adding a recipe
+        const recipeForm = document.getElementById('recipe-form');
+        const recipeName = document.getElementById('recipe-name');
+        const recipeIngredients = document.getElementById('recipe-ingredients');
+        const recipeImage = document.getElementById('recipeImage');
+        
+        // Get references to form input elements for editing a recipe
+        const editForm = document.getElementById('edit-form');
+        const recipeNameEdit = document.getElementById('recipe-name-edit');
+        const recipeIngredientsEdit = document.getElementById('recipe-ingredients-edit');
+        const recipeImageEdit = document.getElementById('recipe-image-edit');
+        
+        // Variable to store the currently edited recipe ID
+        let currentEditingRecipeId;
+        
+        // Event listener for the "Add Recipe" form submission
+        recipeForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const newRecipe = {
+                name: recipeName.value,
+                ingredients: recipeIngredients.value.split(',').map(item => item.trim()), // Split ingredients by commas
+                imageUrl: recipeImage.value,
+            };
+
+            try {
+                const response = await fetch(recipesEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newRecipe),
+                });
+
+                if (!response.ok) {
+                    // Handle the error and display a message
+                    throw new Error('Unable to add the recipe.');
+                }
+                
+                // Clear the input fields after adding
+                recipeName.value = '';
+                recipeIngredients.value = '';
+                recipeImage.value = '';
+
+                // Refresh the displayed recipes
+                fetchRecipes();
+            } catch (error) {
+                console.error(error);
+                displayErrorMessage('An error occurred while adding the recipe.');
+            }
+        });
+
+        // Event listener for the "Delete" button for each recipe
+        async function handleDeleteButtonClick(recipeId) {
+            try {
+                const response = await fetch(`${recipesEndpoint}/${recipeId}`, {
+                    method: 'DELETE',
+                });
+                
+                if (!response.ok) {
+                    // Handle the error and display a message
+
+                    throw new Error('Unable to delete the recipe.');
+                }
+
+                // Refresh the displayed recipes after deletion
+                fetchRecipes();
+            } catch (error) {
+                console.error(error);
+                displayErrorMessage('An error occurred while deleting the recipe.');
+            }
+        }
+        
+        // Function to populate the edit form with recipe details
+        function populateEditForm(recipe) {
+            // Populate the form fields with the existing recipe data
+            recipeNameEdit.value = recipe.name;
+            recipeIngredientsEdit.value = recipe.ingredients;
+            recipeImageEdit.value = recipe.imageUrl;
+
+            // Show the edit form
+            editForm.style.display = 'block';
+        }
+
+        // Event listener for the "Edit" button
+        function handleEditButtonClick(recipeId) {
+            
+            // Set the currentEditingRecipeId
+            currentEditingRecipeId = recipeId;
+            
+            console.log(`Edit button clicked for recipe ID: ${currentEditingRecipeId}`);
+            
+            const recipeToEdit = recipes.find((recipe) => recipe.id === recipeId);
+            if (recipeToEdit) {
+                populateEditForm(recipeToEdit);
+            }
+        }
+
+        // Event listener for the "Save" button in the edit form
+        editForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const updatedRecipe = {
+                name: recipeNameEdit.value,
+                ingredients: recipeIngredientsEdit.value,
+                imageUrl: recipeImageEdit.value,
+            };
+            
+            console.log('Updated Recipe:', updatedRecipe);
+            
+            try {
+                const response = await fetch(`${recipesEndpoint}/${currentEditingRecipeId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updatedRecipe),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Unable to update the recipe.');
+                }
+                
+                // Hide the edit form after saving
+                editForm.style.display = 'none';
+
+                // Refresh the displayed recipes
+                fetchRecipes();
+            } catch (error) {
+                console.error(error);
+            }
+        });
+        
+        // Function to fetch and display recipes from the API
+
+        async function fetchRecipes() {
+            try {
+                const response = await fetch(recipesEndpoint);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch recipes (HTTP ${response.status})`);
+                }
+
+                recipes = await response.json();
+                
+                // Clear the current list of recipes
+                const recipesList = document.getElementById('recipes-list');
+                recipesList.innerHTML = '';
+                
+                // Loop through the recipes and display them
+                recipes.forEach((recipe) => {
+                    const recipeItem = document.createElement('div');
+                    recipeItem.classList.add('recipe-item');
+                    recipeItem.innerHTML = `
+                    <h3>${recipe.name}</h3>
+                    <p>Ingredients: ${recipe.ingredients}</p>
+                    <img src="${recipe.imageUrl}" alt="${recipe.name}" class="recipe-image">
+                    <button onclick="handleEditButtonClick(${recipe.id})">Edit</button>
+                    <button onclick="handleDeleteButtonClick(${recipe.id})">Delete</button>
+                    `;
+                    
+                    recipesList.appendChild(recipeItem);
+                });
+            } catch (error) {
+                console.error(error);
+                displayErrorMessage('An error occurred while fetching recipes: ${error.message}');
+            }
+        }
+        
+        // Call the fetchRecipes function to initially load recipes
+        fetchRecipes();
+        
+        // Error handling functions
+        const errorMessageContainer = document.getElementById('error-message');
+
+        function displayErrorMessage(message) {
+            errorMessageContainer.textContent = message;
+            errorMessageContainer.style.display = 'block';
+        }
+        
+        function clearErrorMessage() {
+            errorMessageContainer.textContent = '';
+            errorMessageContainer.style.display = 'none';
+        }
+        
+        </script>
+      
+</body>
+</html>
